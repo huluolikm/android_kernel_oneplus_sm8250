@@ -1,0 +1,63 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout kernel source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make libssl-dev bison flex bc libelf-dev git wget tar xz-utils gcc-aarch64-linux-gnu device-tree-compiler libncurses-dev zstd lz4 python3 python-is-python3 cpio rsync
+
+      - name: Download AOSP clang-r596125 (Clang 22)
+        run: |
+          git clone --depth 1 -b main-kernel --filter=blob:none --sparse https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang-toolchain
+          cd clang-toolchain
+          git sparse-checkout set clang-r596125
+          git read-tree -mu HEAD
+          cd ..
+          ./clang-toolchain/clang-r596125/bin/clang --version
+
+      - name: Prepare env & copy ready .config
+        run: |
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CC="clang"
+          export CROSS_COMPILE="aarch64-linux-gnu-"
+          export CROSS_COMPILE_ARM32="arm-linux-gnueabi-"
+          export PATH="$PWD/clang-toolchain/clang-r596125/bin:$PATH"
+
+          echo "ARCH=$ARCH" >> $GITHUB_ENV
+          echo "SUBARCH=$SUBARCH" >> $GITHUB_ENV
+          echo "CC=$CC" >> $GITHUB_ENV
+          echo "CROSS_COMPILE=$CROSS_COMPILE" >> $GITHUB_ENV
+          echo "CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32" >> $GITHUB_ENV
+          echo "PATH=$PATH" >> $GITHUB_ENV
+
+          mkdir -p out
+          cp ci_config/.config out/.config
+          make O=out olddefconfi
+
+      - name: Kernel compile
+        run: |
+          make CC="clang" LLVM=1 LLVM_IAS=1 O=out CFLAGS_KERNEL="-Wno-unused-function" -j2
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-build-out
+          if-no-files-found: warn
+          path: |
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/Image.gz
+            out/arch/arm64/boot/dtbo.img
+            out/arch/arm64/boot/dtb
+
