@@ -44,7 +44,7 @@ jobs:
 
           mkdir -p out
           cp ci_config/.config out/.config
-          make O=out olddefconfi
+          make O=out olddefconfig
 
       - name: Kernel compile
         run: |
