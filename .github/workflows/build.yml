@@ -57,6 +57,7 @@ jobs:
           if-no-files-found: warn
           path: |
             out/arch/arm64/boot/Image
+            out/arch/arm64/boot/Image-dtb
             out/arch/arm64/boot/Image.gz
             out/arch/arm64/boot/dtbo.img
             out/arch/arm64/boot/dtb
